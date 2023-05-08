@@ -1,5 +1,13 @@
 <script>
+  import { onMount } from "svelte";
   import Player from "./Player.svelte";
+  import SettingsMenu from "./SettingsMenu.svelte";
+  import { get } from "svelte/store";
+  import {
+    startingLifeTotal,
+    startingTimeLeftSeconds,
+    resetPlayerLifeTotalHistory,
+  } from "./stores";
 
   let playerList = [4];
   let playerBaseClassList = [
@@ -10,15 +18,11 @@
   ];
   let activePlayerIndex = -1;
 
-  let showSettings = false;
+  onMount(resetPlayerLifeTotalHistory);
 
-  // Have settings here?
-  let startingLife = 40
-  let startingTime = 23
-
-  function handleUpdateActive(event) {
+  function handleUpdateActivePlayer(event) {
     let playerIndex = event.detail.index;
-    
+
     for (let i = 0; i < playerList.length; i++) {
       playerList[i].stopTimer();
     }
@@ -32,44 +36,48 @@
     }
   }
 
-  function restart() {
+  function handleShowSettings() {
     for (let i = 0; i < playerList.length; i++) {
-      playerList[i].reset(startingLife, startingTime);
+      playerList[i].stopTimer();
     }
-    showSettings = false;
+    activePlayerIndex = -1;
   }
 
+  function handleRestartGame(event) {
+    for (let i = 0; i < playerList.length; i++) {
+      playerList[i].reset();
+    }
+    resetPlayerLifeTotalHistory();
+  }
 </script>
 
-<div class="grid">
-  {#each playerBaseClassList as playerBaseClass, i}
-    <Player
-      index={i}
-      baseClass={playerBaseClass}
-      bind:this={playerList[i]}
-      on:updateActive={handleUpdateActive}
+<div class="top">
+  <div class="grid">
+    {#each playerBaseClassList as playerBaseClass, i}
+      <Player
+        index={i}
+        baseClass={playerBaseClass}
+        bind:this={playerList[i]}
+        lifeTotal={get(startingLifeTotal)}
+        timeRemaining={get(startingTimeLeftSeconds)}
+        on:updateActivePlayer={handleUpdateActivePlayer}
+      />
+    {/each}
+
+    <SettingsMenu
+      on:restartGame={handleRestartGame}
+      on:showSettings={handleShowSettings}
     />
-  {/each}
-  <div id="settings-button" class="unselectable" on:click={() => (showSettings = true)}>
-    &#9881;
   </div>
 </div>
 
-{#if showSettings}
-  <div id="settings">
-    <div>
-      <div>Starting life: <input type=number bind:value={startingLife}></div>
-      <div>Starting time: <input type=number bind:value={startingTime}></div>
-      <div>Start nyt spil:</div>
-      <button on:click={() => (restart())}>&#x2672;</button>
-    </div>
-    <div>
-      <button on:click={() => (showSettings = false)}>&#10148;</button>
-    </div>
-  </div>
-{/if}
-
 <style>
+  .top {
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+
   .grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -79,49 +87,7 @@
     height: 100vh;
   }
 
-  #settings-button {
-    display: flex;
-    position: absolute;
-    z-index: 99;
-    top: 50%;
-    left: 50%;
-    height: 10vh;
-    width: 10vh;
-    transform: translate(-50%, -50%);
-    color: #d1a215;
-    background-color: #403001;
-    border-radius: 20px;
-    border: 2px solid rgba(175, 175, 175, 0.6);
-    font-size: 10vh;
-    justify-content: center;
-    align-items: center;
-  }
-
-  #settings {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    background-color: black;
-    color: #d1a215;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 100;
-  }
-
-  #settings button {
-    font-size: 15vh;
-    flex: 1;
-    margin: 0rem;
-    padding: 0px;
-    border-radius: 10px;
-    border: 2px solid rgba(175, 175, 175, 0.6);
-    opacity: 1;
-  }
-
-  .unselectable {
+  :global(.unselectable) {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     -khtml-user-select: none;

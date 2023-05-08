@@ -1,14 +1,22 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { get } from "svelte/store";
+  import {
+    startingLifeTotal,
+    startingTimeLeftSeconds,
+    addToPlayerLifeTotalHistory,
+  } from "./stores";
 
-  const DEFAULT_STARTING_LIFE_TOTAL = 40;
-  const DEFAULT_STARTING_TIME = 23 * 60;
+  const dispatch = createEventDispatcher();
+
+  const LIFECHANGE_FADEOUT_DURATION_MS = 1000;
+  const LIFECHANGE_SHOW_DURATION_MS = 10000 - LIFECHANGE_FADEOUT_DURATION_MS;
 
   export let index;
-  export let lifeTotal = DEFAULT_STARTING_LIFE_TOTAL;
-  export let activeTimer = false;
-  export let timeRemaining = DEFAULT_STARTING_TIME;
+  export let lifeTotal;
+  export let timeRemaining;
   export let baseClass;
+  let activeTimer = false;
   let statusClass = "alive-player";
   let activeClass = "inactive-player";
   let lifeButtonClass = "inactive-life-button";
@@ -16,10 +24,17 @@
   let lifeChange = 0;
   let lifeChangeTimestamp = 0;
 
-  const dispatch = createEventDispatcher();
-
   function clicked() {
-    dispatch("updateActive", { index: index });
+    dispatch("updateActivePlayer", { index: index });
+  }
+
+  function recordLifeChangeToHistory() {
+    if (lifeChange !== 0) {
+      addToPlayerLifeTotalHistory(index, {
+        lifeChange: lifeChange,
+        newLifeTotal: lifeTotal,
+      });
+    }
   }
 
   let intervalId = null;
@@ -49,11 +64,11 @@
     }
   }
 
-  export function reset(life, timeMinutes) {
+  export function reset() {
     activeTimer = false;
     clearInterval(intervalId);
-    lifeTotal = life;
-    timeRemaining = timeMinutes * 60;
+    lifeTotal = get(startingLifeTotal);
+    timeRemaining = get(startingTimeLeftSeconds);
     statusClass = "alive-player";
     activeClass = "inactive-player";
     lifeButtonClass = "inactive-life-button";
@@ -77,10 +92,11 @@
       lifeButtonClass = "dead-life-button";
     } else if (lifeTotal > 0) {
       statusClass = "alive-player";
-      lifeButtonClass = activeClass === "active-player" ? "active-life-button" : "inactive-life-button";
+      lifeButtonClass =
+        activeClass === "active-player"
+          ? "active-life-button"
+          : "inactive-life-button";
     }
-
-    // lifeChangeClass = "";
 
     /*
         This sets a timeout that hides the lifeChange.
@@ -92,12 +108,13 @@
         if (changeTimestamp === lifeChangeTimestamp) {
           lifeChangeClass = "hide-me";
           setTimeout(() => {
+            recordLifeChangeToHistory();
             lifeChange = 0;
             lifeChangeTimestamp = 0;
-          }, 500);
+          }, LIFECHANGE_FADEOUT_DURATION_MS);
         }
       },
-      3000,
+      LIFECHANGE_SHOW_DURATION_MS,
       lifeChangeTimestamp
     );
     return lifeTotal;
@@ -112,7 +129,8 @@
         addToLife(-1);
       }}>−</button
     >
-    <div on:click={clicked} on:keypress={clicked} style="flex: 1;">
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <div on:click={clicked} style="flex: 1;">
       <div
         class={lifeChangeClass}
         style="display: flex; font-size: 5vh; position:relative; align-items:center; justify-content: center;"
@@ -128,7 +146,8 @@
       }}>+</button
     >
   </div>
-  <div class="timer" on:click={clicked} on:keypress={clicked}>
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <div class="timer" on:click={clicked}>
     <div class="time-remaining">
       {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60)
         .toString()
@@ -145,7 +164,6 @@
     --color-inactive-a: #403001;
     --color-inactive-b: #6b5101;
     --color-player-dead: #501818;
-   
 
     /** Steel and green
     --color-active-a: #143b15;
@@ -205,18 +223,22 @@
 
   .active-player {
     color: var(--color-inactive-b);
-    background: linear-gradient(0deg, var(--color-active-a) 0%, var(--color-active-b) 100%);
+    background: linear-gradient(
+      0deg,
+      var(--color-active-a) 0%,
+      var(--color-active-b) 100%
+    );
     background-size: 100% 400%;
-    animation: gradient 5s ease-in-out infinite;
+    /* animation: gradient 5s ease-in-out infinite;
     -webkit-transition: all 225ms linear;
     -moz-transition: all 225ms linear;
     -o-transition: all 225ms linear;
-    transition: all 225ms linear;
+    transition: all 225ms linear; */
   }
-  
+
   @keyframes gradient {
     0% {
-      background-position: 100% 100%
+      background-position: 100% 100%;
     }
     50% {
       background-position: 0% 0%;
@@ -228,7 +250,11 @@
 
   .active-life-button {
     color: var(--color-inactive-b);
-    background-image: linear-gradient(to top, var(--color-active-b) 0%, var(--color-active-a) 100%);
+    background-image: linear-gradient(
+      to top,
+      var(--color-active-b) 0%,
+      var(--color-active-a) 100%
+    );
     -webkit-transition: all 225ms linear;
     -moz-transition: all 225ms linear;
     -o-transition: all 225ms linear;
@@ -237,7 +263,11 @@
 
   .inactive-player {
     color: var(--color-active-a);
-    background-image: linear-gradient(to top, var(--color-inactive-b) 0%, var(--color-inactive-a) 100%);
+    background-image: linear-gradient(
+      to top,
+      var(--color-inactive-b) 0%,
+      var(--color-inactive-a) 100%
+    );
     -webkit-transition: all 450ms linear;
     -moz-transition: all 450ms linear;
     -o-transition: all 450ms linear;
@@ -246,7 +276,11 @@
 
   .inactive-life-button {
     color: var(--color-active-a);
-    background-image: linear-gradient(to top, var(--color-inactive-b) 0%, var(--color-inactive-a) 100%);
+    background-image: linear-gradient(
+      to top,
+      var(--color-inactive-b) 0%,
+      var(--color-inactive-a) 100%
+    );
     -webkit-transition: all 450ms linear;
     -moz-transition: all 450ms linear;
     -o-transition: all 450ms linear;
@@ -254,12 +288,20 @@
   }
 
   .dead-player {
-    background-image: linear-gradient(to top, var(--color-player-dead) 0%, var(--color-player-dead) 100%);    
+    background-image: linear-gradient(
+      to top,
+      var(--color-player-dead) 0%,
+      var(--color-player-dead) 100%
+    );
   }
 
   .dead-life-button {
     color: var(--color-active-a);
-    background-image: linear-gradient(to top, var(--color-player-dead) 0%, var(--color-player-dead) 100%);
+    background-image: linear-gradient(
+      to top,
+      var(--color-player-dead) 0%,
+      var(--color-player-dead) 100%
+    );
   }
 
   .upside-down {
@@ -301,7 +343,7 @@
     justify-content: center;
     width: 100%;
     border-radius: 5px;
-    flex: 0 0 50%
+    flex: 0 0 50%;
   }
 
   .timer button {
@@ -311,14 +353,5 @@
   .time-remaining {
     font-size: 10vh;
     margin-right: 0rem;
-  }
-
-  .unselectable {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
   }
 </style>
